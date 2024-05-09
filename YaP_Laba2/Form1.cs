@@ -42,7 +42,11 @@ namespace YaP_Laba2
                 {
                     float x = startX + i * stepSize;
                     double y = ReversePolishNotation.CalculatePolishNotation(ReversePolishNotation.ToPolishNotation(textBox1.Text.Replace("x", x.ToString("F2", CultureInfo.InvariantCulture))));
-                    series.Points.AddXY(x, y);
+                    if (y != double.NaN && y != double.PositiveInfinity & y != double.NegativeInfinity)
+                    {
+                        series.Points.AddXY(x, y);
+                    }
+                    
                 }
                 chart1.Series.Add(series);
                 
@@ -316,8 +320,16 @@ namespace YaP_Laba2
             var dictionary = new Dictionary<string, FloatingPoint>();
             dictionary.Add("x", value);
             var result = expression.Evaluate(dictionary);
-            Console.WriteLine("Результат выражения при x = " + value + " возвращает " + result.RealValue);
-            return result.RealValue;
+            if (result.IsReal)
+            {
+                Console.WriteLine("Результат выражения при x = " + value + " возвращает " + result.RealValue);
+                return result.RealValue;
+            }
+            else
+            {
+                Console.WriteLine("Результат выражения при x = " + value + " возвращает нет данных");
+                return double.NaN;
+            }
         }
         /*
         static char[] expressionSymbols = { '+', '-', '*', '/', '^', 's', 'i', 'n', 'c', 'o', 's', '~', '.', ',', ' ', 'x' };
