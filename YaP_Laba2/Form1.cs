@@ -52,8 +52,16 @@ namespace YaP_Laba2
                 
                 double minY = series.Points.Min(p => p.YValues[0]);
                 double maxY = series.Points.Max(p => p.YValues[0]);
-                chart1.ChartAreas[0].AxisY.Minimum = Math.Floor(minY);
-                chart1.ChartAreas[0].AxisY.Maximum = Math.Ceiling(maxY);
+                if (maxY != minY)
+                {
+                    chart1.ChartAreas[0].AxisY.Minimum = Math.Floor(minY);
+                    chart1.ChartAreas[0].AxisY.Maximum = Math.Ceiling(maxY);
+                }
+                else
+                {
+                    chart1.ChartAreas[0].AxisY.Minimum = minY - 1;
+                    chart1.ChartAreas[0].AxisY.Maximum = maxY + 1;
+                }
             }
         }
 
