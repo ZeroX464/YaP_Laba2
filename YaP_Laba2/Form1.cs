@@ -33,7 +33,7 @@ namespace YaP_Laba2
                 Series series = new Series();
                 series.ChartType = SeriesChartType.Line;
                 reversePolishNotationLabel.Text = ReversePolishNotation.ToPolishNotation(textBox1.Text);
-                label3.Text = ReversePolishNotation.Differentiate(textBox1.Text);
+                label3.Text = ReversePolishNotation.TryDifferentiate(reversePolishNotationLabel.Text);
 
                 int steps = 200;
                 float stepSize = 0.1f;
@@ -81,13 +81,33 @@ namespace YaP_Laba2
                 double yValue = chart1.ChartAreas[0].AxisY.PixelPositionToValue(e.Y);
 
                 label4.Text = xValue.ToString("F2")+" "+yValue.ToString("F2");
-                label2.Text = "Значение производной в точке: " + ReversePolishNotation.DifferentiateAT(label3.Text, xValue).ToString();
+                string derivative;
+                if (xValue < 0)
+                {
+                    derivative = label3.Text.Replace("x", "(" + xValue.ToString() + ")").Replace(',', '.');
+                }
+                else
+                {
+                    derivative = label3.Text.Replace("x", xValue.ToString()).Replace(',', '.');
+                }
+                string derivativeInPolishNotation = ReversePolishNotation.ToPolishNotation(derivative);
+                Console.WriteLine("Производная в польской нотации: " + derivativeInPolishNotation);
+                float derivativeValue = ReversePolishNotation.CalculatePolishNotation(derivativeInPolishNotation);
+                label2.Text = "Значение производной в точке: " + derivativeValue.ToString("F2");
 
-                var derivativeValue = ReversePolishNotation.DifferentiateAT(label3.Text, xValue);
                 Series tangentLine = new Series("TangentLine");
                 tangentLine.ChartType = SeriesChartType.Line;
-                tangentLine.Points.AddXY(xValue - 1, yValue - derivativeValue);
-                tangentLine.Points.AddXY(xValue + 1, yValue + derivativeValue);
+                tangentLine.BorderWidth = 3;
+                float findTangent_y(double x)
+                {
+                    return ReversePolishNotation.CalculatePolishNotation(ReversePolishNotation.ToPolishNotation(textBox1.Text.Replace("x", x.ToString(CultureInfo.InvariantCulture))));
+                }
+                float y_0 = findTangent_y(xValue);
+                label5.Text = "Точка касания: " + xValue.ToString("F2") + " " + y_0.ToString("F2");
+                float tangent_y_1 = y_0 + derivativeValue * (-10 - (float)xValue);
+                float tangent_y_2 = y_0 + derivativeValue * (10 - (float)xValue);
+                tangentLine.Points.AddXY(-10, tangent_y_1);
+                tangentLine.Points.AddXY(10, tangent_y_2);
                 
                 chart1.Series.Add(tangentLine);
             }
@@ -97,7 +117,7 @@ namespace YaP_Laba2
     {
         static int Priority(char operation)
         {
-            if (operation == 's' || operation == 'c')
+            if (operation == 's' || operation == 'c' || operation == 'l')
                 return 5;
             else if (operation == '~')
                 return 4;
@@ -121,7 +141,7 @@ namespace YaP_Laba2
             System.Diagnostics.Debug.WriteLine(commonExpression);
             Stack<char> operationStack = new Stack<char>();
             string PolishNotation = "";
-            char[] operationsSymbols = { '+', '-', '*', '/', '^', 's', 'c' };
+            char[] operationsSymbols = { '+', '-', '*', '/', '^', 's', 'c', 'l' };
             bool operationStackNotEmpty = false;
 
             Action putTopFromStackToNotation = () =>
@@ -129,6 +149,7 @@ namespace YaP_Laba2
                 PolishNotation += operationStack.Peek();
                 if (operationStack.Peek() == 's') { PolishNotation += "in"; }
                 if (operationStack.Peek() == 'c') { PolishNotation += "os"; }
+                if (operationStack.Peek() == 'l') { PolishNotation += "n"; }
                 PolishNotation += " ";
                 operationStack.Pop();
             };
@@ -157,7 +178,7 @@ namespace YaP_Laba2
                     operationStack.Pop(); // Удаление (
                     if (i == commonExpression.Length - 1) { PolishNotation = PolishNotation.Remove(PolishNotation.Length - 1); }
                 }
-                else if (ch == '-' && (i == 0 || commonExpression[i - 1] == '(' || !char.IsDigit(commonExpression[i - 1])))
+                else if (ch == '-' && (i == 0 || commonExpression[i - 1] == '(' || (!char.IsDigit(commonExpression[i - 1]) && !(commonExpression[i - 1] == 'x') && !(commonExpression[i - 1] == ')'))))
                 {
                     operationStack.Push('~'); // Унарный минус
                 }
@@ -179,6 +200,7 @@ namespace YaP_Laba2
                     }
                     operationStack.Push(ch);
                     if (ch == 's' || ch == 'c') { i += 2; } // Пропуск 2 символов для sin, cos
+                    if (ch == 'l') { i++; } // Для ln
                 }
                 else
                 {
@@ -288,6 +310,18 @@ namespace YaP_Laba2
                             operandStack.Push((float)Math.Cos(operand1));
                             i += 2;
                             break;
+                        case 'l':
+                            if (operand1 > 0 && operand1 != 1)
+                            {
+                                operandStack.Push((float)Math.Log(operand1));
+                                i++;
+                            }
+                            else
+                            {
+                                Console.WriteLine("Ошибка при вычислении логарифма");
+                                return float.NaN;
+                            }
+                            break;
                         default:
                             Console.WriteLine($"Такой операции нету: '{ch}'");
                             return float.NaN;
@@ -314,32 +348,6 @@ namespace YaP_Laba2
                 return 0;
             }
         }
-        public static string Differentiate(string expressionString)
-        {
-            var x = SymbolicExpression.Variable("x");
-            SymbolicExpression expression = SymbolicExpression.Parse(expressionString);
-            var derivative = expression.Differentiate(x);
-            return derivative.ToString();
-        }
-        public static double DifferentiateAT(string derivative, double value)
-        {
-            Console.WriteLine(derivative);
-            var expression = SymbolicExpression.Parse(derivative);
-            var dictionary = new Dictionary<string, FloatingPoint>();
-            dictionary.Add("x", value);
-            var result = expression.Evaluate(dictionary);
-            if (result.IsReal)
-            {
-                Console.WriteLine("Результат выражения при x = " + value + " возвращает " + result.RealValue);
-                return result.RealValue;
-            }
-            else
-            {
-                Console.WriteLine("Результат выражения при x = " + value + " возвращает нет данных");
-                return double.NaN;
-            }
-        }
-        /*
         static char[] expressionSymbols = { '+', '-', '*', '/', '^', 's', 'i', 'n', 'c', 'o', 's', '~', '.', ',', ' ', 'x' };
         static char[] operations1 = { 'n', 's', '~' };
         static char[] operations2 = { '+', '-', '*', '/', '^' };
@@ -356,57 +364,49 @@ namespace YaP_Laba2
         }
         public static string TryDifferentiate2(string expressionString)
         {
-            if (double.TryParse(expressionString, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedNumber))
+            if (char.IsDigit(expressionString.Last()))
             {
                 return "0";
-            }
-            else if (expressionString == "x") {
-                return "1";
             }
             else if (expressionString.Last() == 'x')
             {
                 return "1";
             }
-            else if (char.IsDigit(expressionString.Last()))
-            {
-                return "0";
-            }
             else // Строка с операцией
             {
+                char lastChar = expressionString.Last();
+                string stringWithoutLastOperation = expressionString.Remove(expressionString.LastIndexOf(' '));
                 if (operations1.Contains(expressionString.Last())) // Операция с 1 аргументом
                 {
-                    switch (expressionString.Last())
+                    switch (lastChar)
                     {
-                        
                         case 'n':
-                            string stringWithoutSin = expressionString.Remove(expressionString.Length - 4);
-                            return "cos(" + GetArguments(stringWithoutSin) + ") * " + TryDifferentiate2(stringWithoutSin); // sin(?)' = cos(?) * ?'
+                            return "cos(" + GetArguments(stringWithoutLastOperation) + ")*("+ TryDifferentiate2(stringWithoutLastOperation) + ")"; // sin(?)' = cos(?) * ?'
                         case 's':
-                            string stringWithoutCos = expressionString.Remove(expressionString.Length - 4);
-                            return "-sin(" + GetArguments(stringWithoutCos) + ") * " + TryDifferentiate2(stringWithoutCos);
+                            return "-sin(" + GetArguments(stringWithoutLastOperation) + ")*(" + TryDifferentiate2(stringWithoutLastOperation) + ")";
                         case '~':
-                            string stringWithoutUnaryMinus = expressionString.Remove(expressionString.Length - 2);
-                            return "-(" + TryDifferentiate2(stringWithoutUnaryMinus) + ")";
+                            return "-(" + TryDifferentiate2(stringWithoutLastOperation) + ")";
                         default:
                             return "При нахождении производной получена ошибка";
                     }
                 }
-                else
+                else // Операция с 2 аргументами
                 {
-                    string stringWithoutOperations2 = expressionString.Remove(expressionString.Length - 2);
-                    switch (expressionString.Last())
+                    string rightArg = GetArguments(stringWithoutLastOperation);
+                    string leftArg = GetArguments(stringWithoutLastOperation.Remove(SkipArgumentAndGetIndex(stringWithoutLastOperation)));
+                    string derivativeOfRightArg = TryDifferentiate2(stringWithoutLastOperation);
+                    string derivativeOfLeftArg = TryDifferentiate2(stringWithoutLastOperation.Remove(SkipArgumentAndGetIndex(stringWithoutLastOperation)));
+                    switch (lastChar)
                     {
                         case '+':
-                            return TryDifferentiate2(stringWithoutOperations2.Remove(GetIndexForLeftArg(stringWithoutOperations2))) + " + " + TryDifferentiate2(stringWithoutOperations2);
+                            return derivativeOfLeftArg + "+" + derivativeOfRightArg;
                         case '-':
-                            return TryDifferentiate2(stringWithoutOperations2.Remove(GetIndexForLeftArg(stringWithoutOperations2))) + " - " + TryDifferentiate2(stringWithoutOperations2);
+                            return derivativeOfLeftArg + "-(" + derivativeOfRightArg + ")";
                         case '*':
-                            return TryDifferentiate2(stringWithoutOperations2.Remove(GetIndexForLeftArg(stringWithoutOperations2))) + " * " + GetArguments(stringWithoutOperations2) + " + " + GetArguments(stringWithoutOperations2.Remove(GetIndexForLeftArg(stringWithoutOperations2))) + " * " + TryDifferentiate2(stringWithoutOperations2);
+                            return "(" + derivativeOfLeftArg + ")*(" + rightArg + ")+(" + leftArg + ")*(" + derivativeOfRightArg + ")";
                         case '/':
-                            return TryDifferentiate2(stringWithoutOperations2.Remove(GetIndexForLeftArg(stringWithoutOperations2))) + " * " + GetArguments(stringWithoutOperations2) + " - " + GetArguments(stringWithoutOperations2.Remove(GetIndexForLeftArg(stringWithoutOperations2))) + " * " + TryDifferentiate2(stringWithoutOperations2) + " / " + GetArguments(stringWithoutOperations2) + "^2";
+                            return "((" + derivativeOfLeftArg + ")*(" + rightArg + ")-(" + leftArg + ")*(" + derivativeOfRightArg + "))/((" + rightArg + ")^2)";
                         case '^':
-                            string rightArg = GetArguments(stringWithoutOperations2);
-                            string leftArg = GetArguments(stringWithoutOperations2.Remove(GetIndexForLeftArg(stringWithoutOperations2)));
                             if (double.TryParse(leftArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var _) && // Число в степени числа
                                 double.TryParse(rightArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var _))
                             {
@@ -415,16 +415,16 @@ namespace YaP_Laba2
                             else if (double.TryParse(leftArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out _) && // Число в чём-то с x
                                      !double.TryParse(rightArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var _))
                             {
-                                return leftArg + " ^ " + rightArg + " ln(" + leftArg + ")";
+                                return leftArg + "^" + rightArg + "*" + " ln(" + leftArg + ")";
                             }
                             else if (!double.TryParse(leftArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out _) && // x в степени числа
                                      double.TryParse(rightArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedRightArg))
                             {
-                                return rightArg + " * " + leftArg + " ^ " + (parsedRightArg - 1).ToString();
+                                return rightArg + "*" + leftArg + "^" + (parsedRightArg - 1).ToString();
                             }
                             else // x^x
-                            { // a(x)^b(x) = a^b * a'ln(b) + a/b
-                                return leftArg + " ^ " + rightArg + " * " + TryDifferentiate2(stringWithoutOperations2.Remove(GetIndexForLeftArg(stringWithoutOperations2))) + " * " + "ln(" + rightArg + ") + " + leftArg + " / " + rightArg;
+                            { // a(x)^b(x) = a^b * b'ln(a) + b/a
+                                return "(" + leftArg + ")" + "^" + "(" + rightArg + ")" + "*" + "(" + derivativeOfRightArg + ")" + "*" + "ln(" + leftArg + ")+" + "(" + rightArg + ")" + "/" + "(" + leftArg + ")";
                             }
                         default:
                             return "При нахождении производной получена ошибка";
@@ -436,112 +436,171 @@ namespace YaP_Laba2
         }
         public static string GetArguments(string expressionString)
         {
-            if (double.TryParse(expressionString, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedNumber))
-            {
-                return expressionString;
-            }
-            else if (expressionString == "x")
-            {
-                return "x";
-            }
-            else if (expressionString.Last() == 'x' || char.IsDigit(expressionString.Last()))
+            if (expressionString.Last() == 'x' || char.IsDigit(expressionString.Last()))
             {
                 String[] strings = expressionString.Split(' ');
                 return strings[strings.Length - 1];
             }
             else // Строка с операцией
             {
-                if (operations1.Contains(expressionString.Last())) // Операция с 1 аргументом
+                char lastChar = expressionString.Last();
+                string stringWithoutLastOperation = expressionString.Remove(expressionString.LastIndexOf(' '));
+                string rightArg = GetArguments(stringWithoutLastOperation);
+                if (operations1.Contains(lastChar)) // Операция с 1 аргументом
                 {
-                    switch (expressionString.Last())
+                    switch (lastChar)
                     {
                         case 'n':
-                            string sinArg = GetArguments(expressionString.Remove(expressionString.Length - 4));
-                            if (double.TryParse(sinArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedSinArg)) // Число
+                            if (double.TryParse(rightArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedSinArg)) // Число
                             {
-                                return Math.Sin(parsedSinArg).ToString();
+                                double sinResult = Math.Sin(parsedSinArg);
+                                if (sinResult >= 0)
+                                {
+                                    return sinResult.ToString();
+                                }
+                                else
+                                {
+                                    return "(" + sinResult.ToString() + ")";
+                                }
                             }
                             else // Что-то с x
                             {
-                                return "sin(" + sinArg + ")";
+                                return "sin(" + rightArg + ")";
                             }
                         case 's':
-                            string cosArg = GetArguments(expressionString.Remove(expressionString.Length - 4));
-                            if (!double.TryParse(cosArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedCosArg))
+                            if (double.TryParse(rightArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedCosArg))
                             {
-                                return Math.Cos(parsedCosArg).ToString();
+                                double cosResult = Math.Cos(parsedCosArg);
+                                if (cosResult >= 0)
+                                {
+                                    return cosResult.ToString();
+                                }
+                                else
+                                {
+                                    return "(" + cosResult.ToString() + ")";
+                                }
                             }
                             else
                             {
-                                return "cos(" + cosArg + ")";
+                                return "cos(" + rightArg + ")";
                             }
                         case '~':
-                            string unArg = GetArguments(expressionString.Remove(expressionString.Length - 2));
-                            if (double.TryParse(unArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedUnArg)) // Число
+                            if (double.TryParse(rightArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedUnArg)) // Число
                             {
-                                return (-parsedUnArg).ToString();
+                                if (-parsedUnArg < 0)
+                                {
+                                    return "(" + (-parsedUnArg).ToString() + ")";
+                                }
+                                else
+                                {
+                                    return (-parsedUnArg).ToString();
+                                }
                             }
                             else // Что-то с x
                             {
-                                return "-(" + parsedUnArg + ")";
+                                return "(-(" + rightArg + "))";
                             }
                     }
                 }
                 else // Операция с 2 аргументами
                 {
-                    string rightArg = GetArguments(expressionString.Remove(expressionString.Length - 2));
-                    string leftArg = GetArguments(expressionString.Remove(GetIndexForLeftArg(expressionString))); // индекс на котором закончился leftPlus
-                    switch (expressionString.Last())
+                    string leftArg = GetArguments(expressionString.Remove(SkipArgumentAndGetIndex(stringWithoutLastOperation)));
+                    switch (lastChar)
                     {
                         case '+':
                             if (double.TryParse(rightArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedRightPlusArg) &&
                                 double.TryParse(leftArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedLeftPlusArg)) // Числа
                             {
-                                return (parsedLeftPlusArg + parsedRightPlusArg).ToString();
+                                if (parsedLeftPlusArg + parsedRightPlusArg < 0)
+                                {
+                                    return "(" + (parsedLeftPlusArg + parsedRightPlusArg).ToString() + ")";
+                                }
+                                else
+                                {
+                                    return (parsedLeftPlusArg + parsedRightPlusArg).ToString();
+                                }
                             }
                             else // Что-то с x
                             {
-                                return leftArg + " + " + rightArg;
+                                return leftArg + "+" + rightArg;
                             }
                         case '-':
                             if (double.TryParse(rightArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedRightMinusArg) &&
                                 double.TryParse(leftArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedLeftMinusArg)) // Числа
                             {
-                                return (parsedLeftMinusArg - parsedRightMinusArg).ToString();
+                                if (parsedLeftMinusArg - parsedRightMinusArg < 0)
+                                {
+                                    return "(" + (parsedLeftMinusArg - parsedRightMinusArg).ToString() + ")";
+                                }
+                                else
+                                {
+                                    return (parsedLeftMinusArg - parsedRightMinusArg).ToString();
+                                }
                             }
                             else // Что-то с x
                             {
-                                return leftArg + " - " + rightArg;
+                                if (rightArg == "x") { return leftArg + "-" + rightArg; }
+                                else { return leftArg + "-(" + rightArg + ")"; }
                             }
                         case '*':
                             if (double.TryParse(rightArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedRightMultiplyArg) &&
                                 double.TryParse(leftArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedLeftMultiplyArg)) // Числа
                             {
-                                return (parsedLeftMultiplyArg * parsedRightMultiplyArg).ToString();
+                                if (parsedLeftMultiplyArg * parsedRightMultiplyArg < 0)
+                                {
+                                    return "(" + (parsedLeftMultiplyArg * parsedRightMultiplyArg).ToString() + ")";
+                                }
+                                else
+                                {
+                                    return (parsedLeftMultiplyArg * parsedRightMultiplyArg).ToString();
+                                }
                             }
                             else // Что-то с x
                             {
-                                return leftArg + " * " + rightArg;
+                                if (leftArg == "x" && rightArg == "x") { return leftArg + "*" + rightArg; }
+                                else if (leftArg == "x") { return leftArg + "*(" + rightArg + ")"; }
+                                else if (rightArg == "x") { return "(" + leftArg + ")*" + rightArg; }
+                                else { return "(" + leftArg + ")*(" + rightArg + ")"; }
                             }
                         case '/':
                             if (double.TryParse(rightArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedRightDivideArg) &&
                                 double.TryParse(leftArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedLeftDivideArg)) // Числа
                             {
-                                return (parsedLeftDivideArg / parsedRightDivideArg).ToString();
+                                if (parsedLeftDivideArg / parsedRightDivideArg < 0)
+                                {
+                                    return "(" + (parsedLeftDivideArg / parsedRightDivideArg).ToString() + ")";
+                                }
+                                else
+                                {
+                                    return (parsedLeftDivideArg / parsedRightDivideArg).ToString();
+                                }
                             }
                             else // Что-то с x
                             {
-                                return leftArg + " / " + rightArg;
+                                if (leftArg == "x" && rightArg == "x") { return leftArg + "/" + rightArg; }
+                                else if (leftArg == "x") { return leftArg + "/(" + rightArg + ")"; }
+                                else if (rightArg == "x") { return "(" + leftArg + ")/" + rightArg; }
+                                else { return "(" + leftArg + ")/(" + rightArg + ")"; }
                             }
                         case '^':
                             if (double.TryParse(rightArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedRightPowArg) &&
                                 double.TryParse(leftArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedLeftPowArg)) // Числа
                             {
-                                return (Math.Pow(parsedLeftPowArg, parsedRightPowArg)).ToString();
+                                if (Math.Pow(parsedLeftPowArg, parsedRightPowArg) < 0)
+                                {
+                                    return "(" + (Math.Pow(parsedLeftPowArg, parsedRightPowArg)).ToString() + ")";
+                                }
+                                else
+                                {
+                                    return (Math.Pow(parsedLeftPowArg, parsedRightPowArg)).ToString();
+                                }
                             }
                             else // Что-то с x
                             {
-                                return leftArg + " ^ " + rightArg;
+                                if (leftArg == "x" && rightArg == "x") { return leftArg + "^" + rightArg; }
+                                else if (leftArg == "x") { return leftArg + "^(" + rightArg + ")"; }
+                                else if (rightArg == "x") { return "(" + leftArg + ")^" + rightArg; }
+                                else { return "(" + leftArg + ")^(" + rightArg + ")"; }
                             }
 
                     }
@@ -549,42 +608,27 @@ namespace YaP_Laba2
             }
             return null;
         }
-        public static int GetIndexForLeftArg(string expressionString) // Выдаёт индекс последнего необходимого аргумента и ещё на 1 влево чтобы убрать пробел
+        public static int SkipArgumentAndGetIndex(string expressionString)
         {
-            if (double.TryParse(expressionString, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedNumber))
-            {
-                return 0;
-            }
-            else if (expressionString == "x")
-            {
-                return 0;
-            }
-            else if (expressionString.Last() == 'x' || char.IsDigit(expressionString.Last()))
+            char lastChar = expressionString.Last();
+            if (lastChar == 'x' || char.IsDigit(lastChar)) // Число или x
             {
                 return expressionString.LastIndexOf(' ');
             }
-            else // Строка с операцией
+            else if (operations1.Contains(lastChar)) // Операция из 1 стека
             {
-                if (operations1.Contains(expressionString.Last())) // Операция с 1 аргументом
-                {
-                    switch (expressionString.Last())
-                    {
-                        case 'n':
-                        case 's':
-                            return GetIndexForLeftArg(expressionString.Remove(expressionString.Length - 4));
-                        case '~':
-                            return GetIndexForLeftArg(expressionString.Remove(expressionString.Length - 2));
-                    }
-                }
-                else // Операция с 2 аргументами
-                {
-                    //int leftArgIndex = GetIndexForLeftArg(expressionString.Remove(expressionString.Length - 2));
-                    int rightArgIndex = GetIndexForLeftArg(expressionString.Remove(expressionString.Length - 2));
-                    return rightArgIndex;
-                }
+                string stringWithoutLastOperation = expressionString.Remove(expressionString.LastIndexOf(' '));
+                int indexOfSpaceBeforeArgument = SkipArgumentAndGetIndex(stringWithoutLastOperation);
+                return indexOfSpaceBeforeArgument;
             }
-            return -1;
+            else // Операция из 2 стека
+            {
+                string stringWithoutLastOperation = expressionString.Remove(expressionString.LastIndexOf(' '));
+                int indexOfSpaceBeforeRightArgument = SkipArgumentAndGetIndex(stringWithoutLastOperation);
+                string stringWithoutRightArgument = stringWithoutLastOperation.Remove(indexOfSpaceBeforeRightArgument);
+                int indexOfSpaceBeforeLeftArgument = SkipArgumentAndGetIndex(stringWithoutRightArgument);
+                return indexOfSpaceBeforeLeftArgument;
+            }
         }
-        */
     }
 }
