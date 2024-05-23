@@ -415,7 +415,7 @@ namespace YaP_Laba2
                             else if (double.TryParse(leftArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out _) && // Число в чём-то с x
                                      !double.TryParse(rightArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var _))
                             {
-                                return leftArg + "^" + rightArg + "*" + " ln(" + leftArg + ")";
+                                return leftArg + "^" + rightArg + "*" + "ln(" + leftArg + ")";
                             }
                             else if (!double.TryParse(leftArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out _) && // x в степени числа
                                      double.TryParse(rightArg, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var parsedRightArg))
